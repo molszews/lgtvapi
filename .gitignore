@@ -1,0 +1,4 @@
+node_modules
+*.txt
+dist/*
+package-lock.json
