@@ -39,7 +39,7 @@ app.get('/', async (request, response) => {
 });
 
 app.get('/update',async (request, response) => {
-  const output = spawnSync('nohup', ['sh', './dist/update.sh']);
+  const output = spawnSync('nohup', ['sh', './update.sh']);
   const stdout = (output.stdout as unknown as Buffer).toString();
   const stderr = (output.stderr as unknown as Buffer).toString();
   response.type('json').send(JSON.stringify({stdout: stdout, stderr: stderr}, null, 2) + '\n');
