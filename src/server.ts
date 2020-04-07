@@ -3,6 +3,7 @@
 import express, { Request, Response } from 'express';
 import tv, { IWrapper } from './tv';
 import wol from 'node-wol';
+import { spawnSync } from 'child_process';
 
 const runWol = () => {
   wol.wake('38:8C:50:53:C4:81', (error: any) => { });
@@ -16,7 +17,6 @@ app.use((req, res, next) => {
 });
 
 const appGet = (path: string, handler: (lgtv: IWrapper, request: Request<any>, response: Response<any>) => Promise<void>) => {
-
   app.get(path, async (request, response) => {
     try {
       runWol();
@@ -36,6 +36,13 @@ const appGet = (path: string, handler: (lgtv: IWrapper, request: Request<any>, r
 
 app.get('/', async (request, response) => {
   response.send('');
+});
+
+app.get('/update',async (request, response) => {
+  const output = spawnSync('nohup', ['sh', './dist/update.sh']);
+  const stdout = (output.stdout as unknown as Buffer).toString();
+  const stderr = (output.stderr as unknown as Buffer).toString();
+  response.type('json').send(JSON.stringify({stdout: stdout, stderr: stderr}, null, 2) + '\n');
 });
 
 app.get('/system/turnOn', async (request, response) => {

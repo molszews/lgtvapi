@@ -1,3 +1,5 @@
 node_modules
 *.txt
-dist/*
+dist/*.js
+dist/*.ts
+dist/*.js.map
