@@ -5,8 +5,7 @@ import tv, { IWrapper } from './tv';
 import wol from 'node-wol';
 
 const runWol = () => {
-  console.log('wol!');
-  return wol.wake('38:8C:50:53:C4:81', (error: any) => { });
+  wol.wake('38:8C:50:53:C4:81', (error: any) => { });
 };
 
 const app = express();
@@ -17,9 +16,10 @@ app.use((req, res, next) => {
 });
 
 const appGet = (path: string, handler: (lgtv: IWrapper, request: Request<any>, response: Response<any>) => Promise<void>) => {
-  try {
-    runWol();
-    app.get(path, async (request, response) => {
+
+  app.get(path, async (request, response) => {
+    try {
+      runWol();
       var lgtv = await tv();
       try {
         var payload = await handler(lgtv, request, response);
@@ -28,10 +28,10 @@ const appGet = (path: string, handler: (lgtv: IWrapper, request: Request<any>, r
       } finally {
         lgtv.disconnect();
       }
-    });
-  } catch (error) {
-    console.log(error);
-  }
+    } catch (error) {
+      console.log(error);
+    }
+  });
 }
 
 app.get('/', async (request, response) => {
