@@ -4,15 +4,22 @@ import express, { Request, Response } from 'express';
 import tv, { IWrapper } from './tv';
 import wol from 'node-wol';
 
-const runWol = () => wol.wake('38:8C:50:53:C4:81', (error: any) => { });
+const runWol = () => {
+  console.log('wol!');
+  return wol.wake('38:8C:50:53:C4:81', (error: any) => { });
+};
 
-const app = express()
+const app = express();
+
+app.use((req, res, next) => {
+  console.log(`${req.socket.remoteAddress} ${req.method} ${req.originalUrl}`);
+  next()
+});
 
 const appGet = (path: string, handler: (lgtv: IWrapper, request: Request<any>, response: Response<any>) => Promise<void>) => {
   try {
     runWol();
     app.get(path, async (request, response) => {
-      console.log(`${request.socket.remoteAddress} ${request.originalUrl}`);
       var lgtv = await tv();
       try {
         var payload = await handler(lgtv, request, response);
@@ -40,7 +47,8 @@ appGet('/system/turnOff', async (lgtv, request, response) =>
 
 appGet('/tv/openChannel/:channelNo', async (lgtv, request, response) => {
   await lgtv.request('ssap://system.launcher/launch', { id: 'com.webos.app.livetv' });
-  setTimeout(async () => await lgtv.request('ssap://tv/openChannel', { channelNumber: request.params.channelNo }), 1000)
+  // setTimeout(async () => 
+  await lgtv.request('ssap://tv/openChannel', { channelNumber: request.params.channelNo });//, 1000)
 });
 
 appGet('/tv/switchInput/:input', async (lgtv, request, response) =>
