@@ -20,9 +20,9 @@ const appGet = (path: string, handler: (lgtv: IWrapper, request: Request<any>, r
   app.get(path, async (request, response) => {
     try {
       runWol();
-      var lgtv = await tv();
+      const lgtv = await tv();
       try {
-        var payload = await handler(lgtv, request, response);
+        const payload = await handler(lgtv, request, response);
         // response.json(payload);
         response.type('json').send(JSON.stringify(payload, null, 2) + '\n');
       } finally {
@@ -38,11 +38,11 @@ app.get('/', async (request, response) => {
   response.send('');
 });
 
-app.get('/update',async (request, response) => {
+app.get('/update', async (request, response) => {
   const output = spawnSync('nohup', ['sh', './update.sh']);
   const stdout = (output.stdout as unknown as Buffer).toString();
   const stderr = (output.stderr as unknown as Buffer).toString();
-  response.type('json').send(JSON.stringify({stdout: stdout, stderr: stderr}, null, 2) + '\n');
+  response.type('json').send(JSON.stringify({ stdout: stdout, stderr: stderr }, null, 2) + '\n');
 });
 
 app.get('/system/turnOn', async (request, response) => {
@@ -52,10 +52,12 @@ app.get('/system/turnOn', async (request, response) => {
 appGet('/system/turnOff', async (lgtv, request, response) =>
   await lgtv.request('ssap://system/turnOff'));
 
+const timeout = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
 appGet('/tv/openChannel/:channelNo', async (lgtv, request, response) => {
   await lgtv.request('ssap://system.launcher/launch', { id: 'com.webos.app.livetv' });
-  // setTimeout(async () => 
-  await lgtv.request('ssap://tv/openChannel', { channelNumber: request.params.channelNo });//, 1000)
+  await timeout(1500);
+  await lgtv.request('ssap://tv/openChannel', { channelNumber: request.params.channelNo });
 });
 
 appGet('/tv/switchInput/:input', async (lgtv, request, response) =>
@@ -128,6 +130,5 @@ appGet('/getAppState', async (lgtv, request, response) =>
 
 appGet('/getCurrentChannel', async (lgtv, request, response) =>
   await lgtv.request('ssap://tv/getCurrentChannel'));
-
 
 app.listen(3000, () => console.log('Listen'));
