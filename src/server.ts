@@ -59,14 +59,14 @@ app.get('/', async (request, response) => {
   response.send('');
 });
 
-app.get('/update', async (request, response) => {
+app.get('/update-full', async (request, response) => {
   const output = spawnSync('nohup', ['sh', './update.sh']);
   const stdout = (output.stdout as unknown as Buffer).toString();
   const stderr = (output.stderr as unknown as Buffer).toString();
   response.type('json').send(JSON.stringify({ stdout: stdout, stderr: stderr }, null, 2) + '\n');
 });
 
-app.get('/update-roll', async (request, response) => {
+app.get('/update', async (request, response) => {
   const output = spawnSync('nohup', ['sh', './update-roll.sh']);
   const stdout = (output.stdout as unknown as Buffer).toString();
   const stderr = (output.stderr as unknown as Buffer).toString();
