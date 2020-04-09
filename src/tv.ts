@@ -18,7 +18,8 @@ const wrapper = (lgtv: any): IWrapper => {
 };
 
 export default async () => new Promise<IWrapper>(function (resolve, reject) {
-  var lgtv = lgtv2({ url: 'ws://lgwebostv:3000' });
+  var lgtv = lgtv2({ url: 'ws://lgwebostv:3000', timeout: 150, reconnect: null });
   lgtv.on('connect', () => resolve(wrapper(lgtv)));
   lgtv.on('error', (err: any) => reject(err));
+  lgtv.on('close', (err: any) => reject(err));
 });

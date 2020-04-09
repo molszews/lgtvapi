@@ -4,9 +4,32 @@ import express, { Request, Response } from 'express';
 import tv, { IWrapper } from './tv';
 import wol from 'node-wol';
 import { spawnSync } from 'child_process';
+import retry from 'async-retry';
+import ping from 'ping';
 
 const runWol = () => {
   wol.wake('38:8C:50:53:C4:81', (error: any) => { });
+};
+
+const turnOn = async () => {
+  await retry(async bail => {
+    runWol();
+    console.log('sending wol + ping..');
+    let res = await ping.promise.probe('lgwebostv', { timeout: 1 });
+    if (!res.alive) {
+      throw "offline"; // bail(new Error('Unauthorized'))
+    }
+    return;
+  }, {
+    retries: 15, minTimeout: 100, factor: 1, randomize: false
+  })
+
+  return await retry(async bail => {
+    console.log('connecting to ws..');
+    return await tv();
+  }, {
+    retries: 15, minTimeout: 100, factor: 1, randomize: false
+  })
 };
 
 const app = express();
@@ -19,17 +42,15 @@ app.use((req, res, next) => {
 const appGet = (path: string, handler: (lgtv: IWrapper, request: Request<any>, response: Response<any>) => Promise<void>) => {
   app.get(path, async (request, response) => {
     try {
-      runWol();
-      const lgtv = await tv();
+      const lgtv = await turnOn();
       try {
         const payload = await handler(lgtv, request, response);
-        // response.json(payload);
         response.type('json').send(JSON.stringify(payload, null, 2) + '\n');
       } finally {
         lgtv.disconnect();
       }
     } catch (error) {
-      console.log(error);
+      response.type('json').send(JSON.stringify(error, null, 2) + '\n');
     }
   });
 }
@@ -45,18 +66,40 @@ app.get('/update', async (request, response) => {
   response.type('json').send(JSON.stringify({ stdout: stdout, stderr: stderr }, null, 2) + '\n');
 });
 
+app.get('/update-full', async (request, response) => {
+  const output = spawnSync('nohup', ['sh', './update-full.sh']);
+  const stdout = (output.stdout as unknown as Buffer).toString();
+  const stderr = (output.stderr as unknown as Buffer).toString();
+  response.type('json').send(JSON.stringify({ stdout: stdout, stderr: stderr }, null, 2) + '\n');
+});
+
 app.get('/system/turnOn', async (request, response) => {
-  wol.wake('38:8C:50:53:C4:81', (error: any) => response.json(error));
+  try {
+    await turnOn();
+    response.json({});
+  }
+  catch (e) {
+    response.json(e);
+  }
 });
 
 appGet('/system/turnOff', async (lgtv, request, response) =>
   await lgtv.request('ssap://system/turnOff'));
 
-const timeout = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+// const timeout = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 appGet('/tv/openChannel/:channelNo', async (lgtv, request, response) => {
   await lgtv.request('ssap://system.launcher/launch', { id: 'com.webos.app.livetv' });
-  await timeout(1500);
+  await retry(async bail => {
+    console.log('switching to tv mode..');
+    const res = await lgtv.request('ssap://tv/getCurrentChannel');
+    if(!res.returnValue){
+      throw 'not in tv mode yet';
+    }
+    return;
+  }, {
+    retries: 15, minTimeout: 100, factor: 1, randomize: false
+  });
   await lgtv.request('ssap://tv/openChannel', { channelNumber: request.params.channelNo });
 });
 
@@ -91,9 +134,6 @@ appGet('/audio/volumeDown/:delta', async (lgtv, request, response) => {
   const delta = Number(request.params.delta);
   return await lgtv.request('ssap://audio/setVolume', { volume: volume - delta });
 });
-
-appGet('/api/getServiceList', async (lgtv, request, response) =>
-  await lgtv.request('ssap://api/getServiceList'));
 
 appGet('/audio/setMuteOn', async (lgtv, request, response) =>
   await lgtv.request('ssap://audio/setMute', { 'mute': true }));
