@@ -14,16 +14,16 @@ const runWol = () => {
 };
 
 const turnOn = async () => {
-  await retry(async bail => {
+  await retry(async (bail, i) => {
     runWol();
-    console.log('[%%] sending wol + ping..');
+    console.log(`[%%] sending wol + ping.. #${i}`);
     let res = await ping.promise.probe('lgwebostv', { timeout: 1 });
     if (!res.alive) {
-      throw "offline"; // bail(new Error('Unauthorized'))
+      throw "offline";
     }
     return;
   }, {
-    retries: 15, minTimeout: 100, factor: 1, randomize: false
+    retries: 60, minTimeout: 100, factor: 1, randomize: false
   })
 
   return await retry(async (bail, i) => {
@@ -47,12 +47,12 @@ const appGet = (path: string, handler: (lgtv: IWrapper, request: Request<any>, r
       const lgtv = await turnOn();
       try {
         const payload = await handler(lgtv, request, response);
-        response.type('json').send(JSON.stringify({type: 'ok', ...payload}, null, 2) + '\n');
+        response.type('json').send(JSON.stringify({ type: 'ok', ...payload }, null, 2) + '\n');
       } finally {
         lgtv.disconnect();
       }
     } catch (error) {
-      response.type('json').send(JSON.stringify({type: 'error', ...error}, null, 2) + '\n');
+      response.type('json').send(JSON.stringify({ type: 'error', ...error }, null, 2) + '\n');
     }
   });
 }
@@ -85,14 +85,16 @@ app.get('/system/turnOn', async (request, response) => {
   }
 });
 
-appGet('/system/turnOff', async (lgtv, request, response) =>
-  await lgtv.request('ssap://system/turnOff'));
+app.get('/system/turnOff', async (request, response) => {
+  const lgtv = await tv();
+  return response.json(await lgtv.request('ssap://system/turnOff'));
+});
 
 appGet('/tv/openChannel/:channelNo', async (lgtv, request, response) => {
   await lgtv.request('ssap://system.launcher/launch', { id: 'com.webos.app.livetv' });
   await retry(async bail => {
     const res = await lgtv.request('ssap://tv/getCurrentChannel');
-    if(!res.returnValue){
+    if (!res.returnValue) {
       throw '[!!] not in tv mode yet';
     }
     return;
@@ -101,6 +103,9 @@ appGet('/tv/openChannel/:channelNo', async (lgtv, request, response) => {
   });
   await lgtv.request('ssap://tv/openChannel', { channelNumber: request.params.channelNo });
 });
+
+appGet('/tv/sendButton/:button', async (lgtv, request, response) =>
+  await lgtv.sendButton((request.params.button ?? '').toString().toUpperCase()));
 
 appGet('/tv/switchInput/:input', async (lgtv, request, response) =>
   await lgtv.request('ssap://tv/switchInput', { inputId: request.params.input }));
