@@ -58,24 +58,28 @@ const appGet = (path: string, handler: (lgtv: IWrapper, request: Request<any>, r
 }
 
 app.get('/', async (request, response) => {
-  response.send('');
+  response.send('ready to go');
 });
 
-app.get('/update-full', async (request, response) => {
+app.get('/tv', async (request, response) => {
+  response.send('ready to go');
+});
+
+app.get('/tv/update-full', async (request, response) => {
   const output = spawnSync('nohup', ['sh', './update.sh']);
   const stdout = (output.stdout as unknown as Buffer).toString();
   const stderr = (output.stderr as unknown as Buffer).toString();
   response.type('json').send(JSON.stringify({ stdout: stdout, stderr: stderr }, null, 2) + '\n');
 });
 
-app.get('/update', async (request, response) => {
+app.get('/tv/update', async (request, response) => {
   const output = spawnSync('nohup', ['sh', './update-roll.sh']);
   const stdout = (output.stdout as unknown as Buffer).toString();
   const stderr = (output.stderr as unknown as Buffer).toString();
   response.type('json').send(JSON.stringify({ stdout: stdout, stderr: stderr }, null, 2) + '\n');
 });
 
-app.get('/system/turnOn', async (request, response) => {
+app.get('/tv/on', async (request, response) => {
   try {
     await turnOn();
     response.json({});
@@ -85,12 +89,18 @@ app.get('/system/turnOn', async (request, response) => {
   }
 });
 
-app.get('/system/turnOff', async (request, response) => {
+app.get('/tv/off', async (request, response) => {
   const lgtv = await tv();
   return response.json(await lgtv.request('ssap://system/turnOff'));
 });
 
-appGet('/tv/openChannel/:channelNo', async (lgtv, request, response) => {
+appGet('/tv/channels', async (lgtv, request, response) =>
+  await lgtv.request('ssap://tv/getChannelList'));
+
+appGet('/tv/channel', async (lgtv, request, response) =>
+  await lgtv.request('ssap://tv/getCurrentChannel'));
+
+appGet('/tv/channels/:channelNo', async (lgtv, request, response) => {
   await lgtv.request('ssap://system.launcher/launch', { id: 'com.webos.app.livetv' });
   await retry(async bail => {
     const res = await lgtv.request('ssap://tv/getCurrentChannel');
@@ -104,22 +114,22 @@ appGet('/tv/openChannel/:channelNo', async (lgtv, request, response) => {
   await lgtv.request('ssap://tv/openChannel', { channelNumber: request.params.channelNo });
 });
 
-appGet('/tv/sendButton/:button', async (lgtv, request, response) =>
+appGet('/tv/buttons/:button', async (lgtv, request, response) =>
   await lgtv.sendButton((request.params.button ?? '').toString().toUpperCase()));
 
-appGet('/tv/switchInput/:input', async (lgtv, request, response) =>
+appGet('/tv/inputs', async (lgtv, request, response) =>
+  await lgtv.request('ssap://tv/getExternalInputList'));
+
+appGet('/tv/inputs/:input', async (lgtv, request, response) =>
   await lgtv.request('ssap://tv/switchInput', { inputId: request.params.input }));
 
-appGet('/tv/getChannelList', async (lgtv, request, response) =>
-  await lgtv.request('ssap://tv/getChannelList'));
-
-appGet('/audio/getVolume', async (lgtv, request, response) =>
+appGet('/tv/volume', async (lgtv, request, response) =>
   await lgtv.request('ssap://audio/getVolume'));
 
-appGet('/audio/volumeDown', async (lgtv, request, response) =>
+appGet('/tv/volume/down', async (lgtv, request, response) =>
   await lgtv.request('ssap://audio/volumeDown'));
 
-appGet('/audio/volumeUp', async (lgtv, request, response) =>
+appGet('/tv/volume/up', async (lgtv, request, response) =>
   await lgtv.request('ssap://audio/volumeUp'));
 
 const getVolume = async (lgtv: any) => {
@@ -127,52 +137,46 @@ const getVolume = async (lgtv: any) => {
   return Number(volume?.volume ?? 0);
 }
 
-appGet('/audio/volumeUp/:delta', async (lgtv, request, response) => {
+appGet('/tv/volume/up/:delta', async (lgtv, request, response) => {
   const volume = await getVolume(lgtv);
   const delta = Number(request.params.delta);
   return await lgtv.request('ssap://audio/setVolume', { volume: volume + delta });
 });
 
-appGet('/audio/volumeDown/:delta', async (lgtv, request, response) => {
+appGet('/tv/volume/down/:delta', async (lgtv, request, response) => {
   const volume = await getVolume(lgtv);
   const delta = Number(request.params.delta);
   return await lgtv.request('ssap://audio/setVolume', { volume: volume - delta });
 });
 
-appGet('/audio/setMuteOn', async (lgtv, request, response) =>
+appGet('/tv/mute', async (lgtv, request, response) =>
   await lgtv.request('ssap://audio/setMute', { 'mute': true }));
 
-appGet('/audio/setMuteOff', async (lgtv, request, response) =>
+appGet('/tv/unmute', async (lgtv, request, response) =>
   await lgtv.request('ssap://audio/setMute', { 'mute': false }));
 
-appGet('/audio/getStatus', async (lgtv, request, response) =>
+appGet('/tv/audio', async (lgtv, request, response) =>
   await lgtv.request('ssap://audio/getStatus'));
 
-appGet('/tv/getExternalInputList', async (lgtv, request, response) =>
-  await lgtv.request('ssap://tv/getExternalInputList'));
-
-appGet('/media.controls/play', async (lgtv, request, response) =>
+appGet('/tv/play', async (lgtv, request, response) =>
   await lgtv.request('ssap://media.controls/play'));
 
-appGet('/media.controls/pause', async (lgtv, request, response) =>
+appGet('/tv/pause', async (lgtv, request, response) =>
   await lgtv.request('ssap://media.controls/pause'));
 
-appGet('/launch/netflix', async (lgtv, request, response) =>
-  await lgtv.request('ssap://system.launcher/launch', { id: 'netflix' }));
-
-appGet('/launch/youtube', async (lgtv, request, response) =>
-  await lgtv.request('ssap://system.launcher/launch', { id: 'youtube.leanback.v4' }));
-
-appGet('/launch/spotify', async (lgtv, request, response) =>
-  await lgtv.request('ssap://system.launcher/launch', { id: 'spotify-beehive' }));
-
-appGet('/listLaunchPoints', async (lgtv, request, response) =>
+appGet('/tv/apps', async (lgtv, request, response) =>
   await lgtv.request('ssap://com.webos.applicationManager/listLaunchPoints'));
 
-appGet('/getAppState', async (lgtv, request, response) =>
+appGet('/tv/apps/state', async (lgtv, request, response) =>
   await lgtv.request('ssap://system.launcher/getAppState'));
 
-appGet('/getCurrentChannel', async (lgtv, request, response) =>
-  await lgtv.request('ssap://tv/getCurrentChannel'));
+appGet('/tv/netflix', async (lgtv, request, response) =>
+  await lgtv.request('ssap://system.launcher/launch', { id: 'netflix' }));
+
+appGet('/tv/youtube', async (lgtv, request, response) =>
+  await lgtv.request('ssap://system.launcher/launch', { id: 'youtube.leanback.v4' }));
+
+appGet('/tv/spotify', async (lgtv, request, response) =>
+  await lgtv.request('ssap://system.launcher/launch', { id: 'spotify-beehive' }));
 
 app.listen(3000, () => console.log('Listen'));
