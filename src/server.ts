@@ -127,27 +127,25 @@ appGet('/tv/volume', async (lgtv, request, response) =>
   await lgtv.request('ssap://audio/getVolume'));
 
 appGet('/tv/volume/down', async (lgtv, request, response) =>
-  await lgtv.request('ssap://audio/volumeDown'));
+  await changeVolume(lgtv, -3));
 
 appGet('/tv/volume/up', async (lgtv, request, response) =>
-  await lgtv.request('ssap://audio/volumeUp'));
+  await changeVolume(lgtv, 3));
 
 const getVolume = async (lgtv: any) => {
   const volume = await lgtv.request('ssap://audio/getVolume');
   return Number(volume?.volume ?? 0);
 }
-
-appGet('/tv/volume/up/:delta', async (lgtv, request, response) => {
+const changeVolume = async (lgtv: any, delta: number) => {
   const volume = await getVolume(lgtv);
-  const delta = Number(request.params.delta);
   return await lgtv.request('ssap://audio/setVolume', { volume: volume + delta });
-});
+}
 
-appGet('/tv/volume/down/:delta', async (lgtv, request, response) => {
-  const volume = await getVolume(lgtv);
-  const delta = Number(request.params.delta);
-  return await lgtv.request('ssap://audio/setVolume', { volume: volume - delta });
-});
+appGet('/tv/volume/up/:delta', async (lgtv, request, response) =>
+  await changeVolume(lgtv, Number(request.params.delta)));
+
+appGet('/tv/volume/down/:delta', async (lgtv, request, response) =>
+  await changeVolume(lgtv, -Number(request.params.delta)));
 
 appGet('/tv/mute', async (lgtv, request, response) =>
   await lgtv.request('ssap://audio/setMute', { 'mute': true }));
